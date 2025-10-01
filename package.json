@@ -1,0 +1,30 @@
+{
+  "name": "lowball",
+  "version": "1.0.0",
+  "description": "Lowball - Bid low, win tasks. A reverse auction system for coordinating unwanted tasks using Cloudflare Agents",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest"
+  },
+  "keywords": [
+    "cloudflare",
+    "agents",
+    "auction",
+    "task-management"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^4.43.0"
+  },
+  "dependencies": {
+    "agents": "latest",
+    "ai": "^5.0.71",
+    "workers-ai-provider": "^2.0.0"
+  }
+}
