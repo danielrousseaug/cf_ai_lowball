@@ -1,0 +1,28 @@
+name = "reverse-auction-coordinator"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "86a3ccbe8a9a8eb28130bb76f74672d9"
+
+[dev]
+port = 8787
+
+[durable_objects]
+bindings = [
+  { name = "AUCTION_AGENT", class_name = "AuctionAgent" },
+  { name = "CHAT_AGENT", class_name = "ChatAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AuctionAgent"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ChatAgent"]
+
+[ai]
+binding = "AI"
+
+# [[send_email]]
+# name = "EMAIL"
