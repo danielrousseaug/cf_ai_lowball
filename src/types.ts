@@ -15,10 +15,17 @@ export interface TaskDetails {
   startingPayment: Currency;
   currentBid: Currency;
   auctionType: 'standard' | 'dutch' | 'buyItNow';
+  buyItNowPrice?: Currency;
+  dutchDecreaseRate?: number; // Amount to decrease per hour for dutch auctions
   duration: number; // Duration in milliseconds
   startTime: number; // Timestamp
   endTime: number; // Timestamp
   status: 'active' | 'completed' | 'cancelled' | 'in-progress';
+  winnerId?: string;
+  verificationRequired: boolean;
+  verificationMethod?: 'photo' | 'peer' | 'auto';
+  category?: string;
+  tags?: string[];
 }
 
 export interface Bid {
@@ -65,4 +72,41 @@ export interface Balances {
   points: number;
   favorTokens: number;
   timeBank: number; // in minutes
+}
+
+export interface CompletedTask {
+  taskId: string;
+  winnerId: string;
+  creatorId: string;
+  completedAt: number;
+  paymentAmount: Currency;
+  qualityRating?: number;
+  feedback?: string;
+  verified: boolean;
+}
+
+export interface AuctionState {
+  tasks: Map<string, TaskDetails>;
+  bids: Map<string, Bid[]>; // taskId -> array of bids
+  users: Map<string, UserProfile>;
+  balances: Map<string, Balances>;
+  completedTasks: CompletedTask[];
+  leaderboard: LeaderboardEntry[];
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  userName: string;
+  tasksCompleted: number;
+  pointsEarned: number;
+  reliabilityScore: number;
+  rank: number;
+}
+
+export interface NotificationEvent {
+  type: 'outbid' | 'won' | 'new_task' | 'task_ending' | 'task_completed';
+  userId: string;
+  taskId?: string;
+  message: string;
+  timestamp: number;
 }
