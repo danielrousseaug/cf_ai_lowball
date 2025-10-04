@@ -49,10 +49,86 @@ export class AuctionAgent extends Agent {
     }
   }
 
+  // ==================== TASK CREATION ====================
+
+  async createTask(params: {
+    title: string;
+    description: string;
+    creatorId: string;
+    startingPayment: Currency;
+    duration: number;
+    auctionType?: 'standard' | 'dutch' | 'buyItNow';
+    buyItNowPrice?: Currency;
+    dutchDecreaseRate?: number;
+    verificationRequired?: boolean;
+    verificationMethod?: 'photo' | 'peer' | 'auto';
+    category?: string;
+    tags?: string[];
+  }): Promise<TaskDetails> {
+    await this.ensureInitialized();
+
+    const taskId = this.generateId();
+    const now = Date.now();
+
+    const task: TaskDetails = {
+      id: taskId,
+      title: params.title,
+      description: params.description,
+      creatorId: params.creatorId,
+      startingPayment: params.startingPayment,
+      currentBid: params.startingPayment,
+      auctionType: params.auctionType || 'standard',
+      buyItNowPrice: params.buyItNowPrice,
+      dutchDecreaseRate: params.dutchDecreaseRate,
+      duration: params.duration,
+      startTime: now,
+      endTime: now + params.duration,
+      status: 'active',
+      verificationRequired: params.verificationRequired || false,
+      verificationMethod: params.verificationMethod,
+      category: params.category,
+      tags: params.tags
+    };
+
+    this.state.tasks.set(taskId, task);
+    this.state.bids.set(taskId, []);
+
+    await this.persistState();
+    await this.notifyUsersOfNewTask(task);
+
+    return task;
+  }
+
   // ==================== UTILITIES ====================
 
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // ==================== NOTIFICATIONS ====================
+
+  private async sendNotification(event: NotificationEvent) {
+    // In a real implementation, this would send via WebSocket or push notification
+    // For now, we'll just log it
+    console.log('Notification:', event);
+  }
+
+  private async notifyUsersOfNewTask(task: TaskDetails) {
+    // Notify all users with matching preferences
+    for (const [userId, user] of this.state.users.entries()) {
+      if (user.preferences.notificationSettings.newTasks) {
+        if (!user.preferences.categoryPreferences ||
+            user.preferences.categoryPreferences.includes(task.category || '')) {
+          await this.sendNotification({
+            type: 'new_task',
+            userId: userId,
+            taskId: task.id,
+            message: `New task posted: ${task.title}`,
+            timestamp: Date.now()
+          });
+        }
+      }
+    }
   }
 
   // ==================== STATE PERSISTENCE ====================
