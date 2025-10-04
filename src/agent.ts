@@ -99,6 +99,60 @@ export class AuctionAgent extends Agent {
     return task;
   }
 
+  // ==================== USER MANAGEMENT ====================
+
+  async createUser(params: {
+    id: string;
+    name: string;
+    email: string;
+  }): Promise<UserProfile> {
+    await this.ensureInitialized();
+
+    const user: UserProfile = {
+      id: params.id,
+      name: params.name,
+      email: params.email,
+      reliabilityScore: 100,
+      qualityRating: 5,
+      totalTasksCompleted: 0,
+      totalTasksCreated: 0,
+      bidHistory: [],
+      achievements: [],
+      preferences: {
+        notificationSettings: {
+          outbid: true,
+          newTasks: true,
+          taskReminders: true
+        }
+      }
+    };
+
+    this.state.users.set(params.id, user);
+    this.state.balances.set(params.id, this.getDefaultBalances());
+
+    await this.persistState();
+
+    return user;
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    await this.ensureInitialized();
+    return this.state.users.get(userId) || null;
+  }
+
+  private getDefaultBalances(): Balances {
+    return {
+      cash: 0,
+      points: 100, // Starting points
+      favorTokens: 2, // Starting favor tokens
+      timeBank: 0
+    };
+  }
+
+  async getUserBalance(userId: string): Promise<Balances> {
+    return this.state.balances.get(userId) || this.getDefaultBalances();
+  }
+
   // ==================== UTILITIES ====================
 
   private generateId(): string {
