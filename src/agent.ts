@@ -165,6 +165,12 @@ export class AuctionAgent extends Agent {
     // Update task current bid
     task.currentBid = params.amount;
 
+    // Last-minute bidding protection
+    const timeRemaining = task.endTime - Date.now();
+    if (timeRemaining < 60000) { // Less than 1 minute
+      task.endTime += 5 * 60000; // Extend by 5 minutes
+    }
+
     await this.persistState();
 
     return { success: true, message: 'Bid placed successfully', bid };
