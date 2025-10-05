@@ -99,6 +99,77 @@ export class AuctionAgent extends Agent {
     return task;
   }
 
+  // ==================== BIDDING MECHANICS ====================
+
+  async placeBid(params: {
+    taskId: string;
+    userId: string;
+    amount: Currency;
+  }): Promise<{ success: boolean; message: string; bid?: Bid }> {
+    await this.ensureInitialized();
+
+    const task = this.state.tasks.get(params.taskId);
+
+    if (!task) {
+      return { success: false, message: 'Task not found' };
+    }
+
+    if (task.status !== 'active') {
+      return { success: false, message: 'Task is not active' };
+    }
+
+    if (Date.now() > task.endTime) {
+      return { success: false, message: 'Auction has ended' };
+    }
+
+    if (task.creatorId === params.userId) {
+      return { success: false, message: 'Cannot bid on your own task' };
+    }
+
+    // Validate currency type matches
+    if (params.amount.type !== task.currentBid.type) {
+      return { success: false, message: 'Currency type must match task payment type' };
+    }
+
+    // In reverse auction, bid must be LOWER than current bid
+    if (params.amount.amount >= task.currentBid.amount) {
+      return { success: false, message: 'Bid must be lower than current bid' };
+    }
+
+    // Create bid
+    const bid: Bid = {
+      id: this.generateId(),
+      taskId: params.taskId,
+      userId: params.userId,
+      amount: params.amount,
+      timestamp: Date.now()
+    };
+
+    const bids = this.state.bids.get(params.taskId) || [];
+
+    // Notify previous bidder they were outbid
+    if (bids.length > 0) {
+      const previousBid = bids[bids.length - 1];
+      await this.sendNotification({
+        type: 'outbid',
+        userId: previousBid.userId,
+        taskId: params.taskId,
+        message: `You've been outbid on "${task.title}"`,
+        timestamp: Date.now()
+      });
+    }
+
+    bids.push(bid);
+    this.state.bids.set(params.taskId, bids);
+
+    // Update task current bid
+    task.currentBid = params.amount;
+
+    await this.persistState();
+
+    return { success: true, message: 'Bid placed successfully', bid };
+  }
+
   // ==================== USER MANAGEMENT ====================
 
   async createUser(params: {
