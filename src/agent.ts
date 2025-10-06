@@ -230,6 +230,47 @@ export class AuctionAgent extends Agent {
     return this.state.balances.get(userId) || this.getDefaultBalances();
   }
 
+  // ==================== QUERIES ====================
+
+  async getTask(taskId: string): Promise<TaskDetails | null> {
+    await this.ensureInitialized();
+    return this.state.tasks.get(taskId) || null;
+  }
+
+  async getActiveTasks(): Promise<TaskDetails[]> {
+    await this.ensureInitialized();
+
+    return Array.from(this.state.tasks.values())
+      .filter(t => t.status === 'active')
+      .sort((a, b) => a.endTime - b.endTime);
+  }
+
+  async getTaskBids(taskId: string): Promise<Bid[]> {
+    await this.ensureInitialized();
+    return this.state.bids.get(taskId) || [];
+  }
+
+  async getUserTasks(userId: string): Promise<{
+    created: TaskDetails[];
+    won: TaskDetails[];
+    bidding: TaskDetails[];
+  }> {
+    const allTasks = Array.from(this.state.tasks.values());
+
+    const created = allTasks.filter(t => t.creatorId === userId);
+    const won = allTasks.filter(t => t.winnerId === userId);
+
+    const userBids = Array.from(this.state.bids.entries())
+      .filter(([_, bids]) => bids.some(b => b.userId === userId))
+      .map(([taskId, _]) => taskId);
+
+    const bidding = allTasks.filter(t =>
+      userBids.includes(t.id) && t.status === 'active' && t.winnerId !== userId
+    );
+
+    return { created, won, bidding };
+  }
+
   // ==================== UTILITIES ====================
 
   private generateId(): string {
