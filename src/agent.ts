@@ -271,6 +271,64 @@ export class AuctionAgent extends Agent {
     return { created, won, bidding };
   }
 
+  // ==================== CURRENCY & PAYMENT ====================
+
+  private async processPayment(params: {
+    fromUserId: string;
+    toUserId: string;
+    amount: Currency;
+  }) {
+    const fromBalance = this.state.balances.get(params.fromUserId) || this.getDefaultBalances();
+    const toBalance = this.state.balances.get(params.toUserId) || this.getDefaultBalances();
+
+    // Deduct from creator
+    if (params.amount.type === 'cash') {
+      fromBalance.cash -= params.amount.amount;
+    } else if (params.amount.type === 'points') {
+      fromBalance.points -= params.amount.amount;
+    } else if (params.amount.type === 'favorTokens') {
+      fromBalance.favorTokens -= params.amount.amount;
+    } else if (params.amount.type === 'timeBank') {
+      fromBalance.timeBank -= params.amount.amount;
+    }
+
+    // Add to winner
+    if (params.amount.type === 'cash') {
+      toBalance.cash += params.amount.amount;
+    } else if (params.amount.type === 'points') {
+      toBalance.points += params.amount.amount;
+    } else if (params.amount.type === 'favorTokens') {
+      toBalance.favorTokens += params.amount.amount;
+    } else if (params.amount.type === 'timeBank') {
+      toBalance.timeBank += params.amount.amount;
+    }
+
+    this.state.balances.set(params.fromUserId, fromBalance);
+    this.state.balances.set(params.toUserId, toBalance);
+  }
+
+  async addBalance(params: {
+    userId: string;
+    currency: Currency;
+  }): Promise<Balances> {
+    const balance = this.state.balances.get(params.userId) || this.getDefaultBalances();
+
+    if (params.currency.type === 'cash') {
+      balance.cash += params.currency.amount;
+    } else if (params.currency.type === 'points') {
+      balance.points += params.currency.amount;
+    } else if (params.currency.type === 'favorTokens') {
+      balance.favorTokens += params.currency.amount;
+    } else if (params.currency.type === 'timeBank') {
+      balance.timeBank += params.currency.amount;
+    }
+
+    this.state.balances.set(params.userId, balance);
+    await this.persistState();
+
+    return balance;
+  }
+
   // ==================== UTILITIES ====================
 
   private generateId(): string {
