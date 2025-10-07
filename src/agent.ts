@@ -271,6 +271,81 @@ export class AuctionAgent extends Agent {
     return { created, won, bidding };
   }
 
+  // ==================== TASK COMPLETION ====================
+
+  async completeTask(params: {
+    taskId: string;
+    completerId: string;
+    proof?: string; // URL to proof image or data
+    qualityRating?: number;
+    feedback?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const task = this.state.tasks.get(params.taskId);
+
+    if (!task) {
+      return { success: false, message: 'Task not found' };
+    }
+
+    if (task.winnerId !== params.completerId) {
+      return { success: false, message: 'Only the winner can complete this task' };
+    }
+
+    if (task.status !== 'in-progress') {
+      return { success: false, message: 'Task is not in progress' };
+    }
+
+    // Process payment
+    await this.processPayment({
+      fromUserId: task.creatorId,
+      toUserId: task.winnerId,
+      amount: task.currentBid
+    });
+
+    // Update task status
+    task.status = 'completed';
+
+    // Record completed task
+    const completedTask: CompletedTask = {
+      taskId: params.taskId,
+      winnerId: task.winnerId,
+      creatorId: task.creatorId,
+      completedAt: Date.now(),
+      paymentAmount: task.currentBid,
+      qualityRating: params.qualityRating,
+      feedback: params.feedback,
+      verified: true
+    };
+    this.state.completedTasks.push(completedTask);
+
+    // Update user profiles
+    await this.updateUserReputation(task.winnerId, params.qualityRating);
+    await this.checkAchievements(task.winnerId);
+
+    await this.persistState();
+
+    return { success: true, message: 'Task completed successfully' };
+  }
+
+  async updateUserReputation(userId: string, qualityRating?: number) {
+    const user = this.state.users.get(userId);
+    if (!user) return;
+
+    user.totalTasksCompleted++;
+
+    if (qualityRating !== undefined) {
+      // Update quality rating (weighted average)
+      const totalRatings = user.totalTasksCompleted;
+      user.qualityRating =
+        (user.qualityRating * (totalRatings - 1) + qualityRating) / totalRatings;
+    }
+
+    // Calculate reliability score based on completion rate
+    user.reliabilityScore = Math.min(100, user.reliabilityScore + 0.5);
+
+    this.state.users.set(userId, user);
+    await this.persistState();
+  }
+
   // ==================== CURRENCY & PAYMENT ====================
 
   private async processPayment(params: {
