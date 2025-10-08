@@ -41,6 +41,60 @@ export default {
         return jsonResponse(result, corsHeaders);
       }
 
+      if (url.pathname === '/api/bids' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await stub.placeBid(body);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/tasks\/[^/]+\/bids$/) && request.method === 'GET') {
+        const taskId = url.pathname.split('/')[3];
+        const result = await stub.getTaskBids(taskId);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname === '/api/tasks/buy-now' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await stub.acceptBuyItNow(body);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname === '/api/tasks/complete' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await stub.completeTask(body);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname === '/api/users' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await stub.createUser(body);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/users\/[^/]+$/) && request.method === 'GET') {
+        const userId = url.pathname.split('/').pop()!;
+        const result = await stub.getUserProfile(userId);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/users\/[^/]+\/balance$/) && request.method === 'GET') {
+        const userId = url.pathname.split('/')[3];
+        const result = await stub.getUserBalance(userId);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname === '/api/balance/add' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await stub.addBalance(body);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/users\/[^/]+\/tasks$/) && request.method === 'GET') {
+        const userId = url.pathname.split('/')[3];
+        const result = await stub.getUserTasks(userId);
+        return jsonResponse(result, corsHeaders);
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       return jsonResponse(
