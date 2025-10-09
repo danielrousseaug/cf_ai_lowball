@@ -271,6 +271,79 @@ export class AuctionAgent extends Agent {
     return { created, won, bidding };
   }
 
+  // ==================== AUCTION LIFECYCLE ====================
+
+  async acceptBuyItNow(params: {
+    taskId: string;
+    userId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    await this.ensureInitialized();
+
+    const task = this.state.tasks.get(params.taskId);
+
+    if (!task || !task.buyItNowPrice) {
+      return { success: false, message: 'Buy It Now not available' };
+    }
+
+    if (task.status !== 'active') {
+      return { success: false, message: 'Task is not active' };
+    }
+
+    // Immediately end auction and assign winner
+    task.status = 'in-progress';
+    task.winnerId = params.userId;
+    task.currentBid = task.buyItNowPrice;
+    task.endTime = Date.now();
+
+    await this.persistState();
+    await this.notifyTaskWinner(task);
+
+    return { success: true, message: 'Task claimed via Buy It Now' };
+  }
+
+  private async checkEndedAuctions() {
+    const now = Date.now();
+
+    for (const [taskId, task] of this.state.tasks.entries()) {
+      if (task.status === 'active' && now >= task.endTime) {
+        await this.finalizeAuction(taskId);
+      }
+    }
+  }
+
+  private async finalizeAuction(taskId: string) {
+    const task = this.state.tasks.get(taskId);
+    if (!task) return;
+
+    const bids = this.state.bids.get(taskId) || [];
+
+    if (bids.length > 0) {
+      // Winner is the lowest bidder
+      const winningBid = bids[bids.length - 1];
+      task.winnerId = winningBid.userId;
+      task.status = 'in-progress';
+
+      await this.notifyTaskWinner(task);
+    } else {
+      // No bids, cancel task
+      task.status = 'cancelled';
+    }
+
+    await this.persistState();
+  }
+
+  private async notifyTaskWinner(task: TaskDetails) {
+    if (task.winnerId) {
+      await this.sendNotification({
+        type: 'won',
+        userId: task.winnerId,
+        taskId: task.id,
+        message: `Congratulations! You won the task "${task.title}"`,
+        timestamp: Date.now()
+      });
+    }
+  }
+
   // ==================== TASK COMPLETION ====================
 
   async completeTask(params: {
