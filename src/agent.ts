@@ -419,6 +419,122 @@ export class AuctionAgent extends Agent {
     await this.persistState();
   }
 
+  // ==================== GAMIFICATION ====================
+
+  private async checkAchievements(userId: string) {
+    const user = this.state.users.get(userId);
+    if (!user) return;
+
+    const achievements: Achievement[] = [];
+
+    // Check various achievement criteria
+    if (user.totalTasksCompleted === 1) {
+      achievements.push({
+        id: 'first-task',
+        name: 'Task Taker',
+        description: 'Complete your first task',
+        unlockedAt: Date.now()
+      });
+    }
+
+    if (user.totalTasksCompleted === 10) {
+      achievements.push({
+        id: 'task-veteran',
+        name: 'Task Veteran',
+        description: 'Complete 10 tasks',
+        unlockedAt: Date.now()
+      });
+    }
+
+    if (user.totalTasksCompleted === 100) {
+      achievements.push({
+        id: 'task-master',
+        name: 'Task Master',
+        description: 'Complete 100 tasks',
+        unlockedAt: Date.now()
+      });
+    }
+
+    // Category-specific achievements
+    const categoryCount = this.getCompletedTasksByCategory(userId);
+    for (const [category, count] of Object.entries(categoryCount)) {
+      if (count === 10) {
+        achievements.push({
+          id: `${category}-hero`,
+          name: `${category.charAt(0).toUpperCase() + category.slice(1)} Hero`,
+          description: `Complete 10 ${category} tasks`,
+          unlockedAt: Date.now()
+        });
+      }
+    }
+
+    // Add new achievements to user
+    for (const achievement of achievements) {
+      if (!user.achievements.find(a => a.id === achievement.id)) {
+        user.achievements.push(achievement);
+        await this.sendNotification({
+          type: 'new_task',
+          userId: userId,
+          message: `Achievement unlocked: ${achievement.name}`,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    await this.persistState();
+  }
+
+  private getCompletedTasksByCategory(userId: string): Record<string, number> {
+    const counts: Record<string, number> = {};
+
+    for (const completedTask of this.state.completedTasks) {
+      if (completedTask.winnerId === userId) {
+        const task = this.state.tasks.get(completedTask.taskId);
+        if (task && task.category) {
+          counts[task.category] = (counts[task.category] || 0) + 1;
+        }
+      }
+    }
+
+    return counts;
+  }
+
+  private async updateLeaderboard() {
+    const entries: LeaderboardEntry[] = [];
+
+    for (const [userId, user] of this.state.users.entries()) {
+      const balance = this.state.balances.get(userId) || this.getDefaultBalances();
+      entries.push({
+        userId: userId,
+        userName: user.name,
+        tasksCompleted: user.totalTasksCompleted,
+        pointsEarned: balance.points,
+        reliabilityScore: user.reliabilityScore,
+        rank: 0
+      });
+    }
+
+    // Sort by tasks completed, then by points
+    entries.sort((a, b) => {
+      if (a.tasksCompleted !== b.tasksCompleted) {
+        return b.tasksCompleted - a.tasksCompleted;
+      }
+      return b.pointsEarned - a.pointsEarned;
+    });
+
+    // Assign ranks
+    entries.forEach((entry, index) => {
+      entry.rank = index + 1;
+    });
+
+    this.state.leaderboard = entries;
+    await this.persistState();
+  }
+
+  async getLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
+    return this.state.leaderboard.slice(0, limit);
+  }
+
   // ==================== CURRENCY & PAYMENT ====================
 
   private async processPayment(params: {
