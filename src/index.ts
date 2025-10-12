@@ -95,6 +95,24 @@ export default {
         return jsonResponse(result, corsHeaders);
       }
 
+      if (url.pathname.match(/^\/api\/users\/[^/]+\/recommendations$/) && request.method === 'GET') {
+        const userId = url.pathname.split('/')[3];
+        const result = await stub.getRecommendedTasks(userId);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
+        const limit = parseInt(url.searchParams.get('limit') || '10');
+        const result = await stub.getLeaderboard(limit);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/tasks\/[^/]+\/predictions$/) && request.method === 'GET') {
+        const taskId = url.pathname.split('/')[3];
+        const result = await stub.getPredictedBidRange(taskId);
+        return jsonResponse(result, corsHeaders);
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       return jsonResponse(
