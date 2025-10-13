@@ -535,6 +535,89 @@ export class AuctionAgent extends Agent {
     return this.state.leaderboard.slice(0, limit);
   }
 
+  // ==================== SMART SCHEDULING ====================
+
+  async getPredictedBidRange(taskId: string): Promise<{ min: number; max: number; average: number } | null> {
+    const task = this.state.tasks.get(taskId);
+    if (!task) return null;
+
+    // Find similar completed tasks
+    const similarTasks = this.state.completedTasks.filter(ct => {
+      const t = this.state.tasks.get(ct.taskId);
+      return t && t.category === task.category && ct.paymentAmount.type === task.startingPayment.type;
+    });
+
+    if (similarTasks.length === 0) {
+      return null;
+    }
+
+    const amounts = similarTasks.map(t => t.paymentAmount.amount);
+    const min = Math.min(...amounts);
+    const max = Math.max(...amounts);
+    const average = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+
+    return { min, max, average };
+  }
+
+  async getRecommendedTasks(userId: string): Promise<TaskDetails[]> {
+    const user = this.state.users.get(userId);
+    if (!user) return [];
+
+    const activeTasks = Array.from(this.state.tasks.values())
+      .filter(t => t.status === 'active');
+
+    // Score tasks based on user preferences and history
+    const scoredTasks = activeTasks.map(task => {
+      let score = 0;
+
+      // Prefer categories user has bid on before
+      if (user.preferences.categoryPreferences?.includes(task.category || '')) {
+        score += 10;
+      }
+
+      // Prefer tasks with payment types user likes
+      const completedTasksByUser = this.state.completedTasks
+        .filter(ct => ct.winnerId === userId);
+
+      const preferredCurrency = this.getMostUsedCurrency(completedTasksByUser);
+      if (task.currentBid.type === preferredCurrency) {
+        score += 5;
+      }
+
+      // Prefer tasks ending soon
+      const timeRemaining = task.endTime - Date.now();
+      if (timeRemaining < 60 * 60 * 1000) { // Less than 1 hour
+        score += 3;
+      }
+
+      return { task, score };
+    });
+
+    // Sort by score and return top tasks
+    scoredTasks.sort((a, b) => b.score - a.score);
+    return scoredTasks.slice(0, 10).map(st => st.task);
+  }
+
+  private getMostUsedCurrency(completedTasks: CompletedTask[]): string {
+    const counts: Record<string, number> = {};
+
+    for (const task of completedTasks) {
+      counts[task.paymentAmount.type] = (counts[task.paymentAmount.type] || 0) + 1;
+    }
+
+    let maxCount = 0;
+    let mostUsed = 'points';
+
+    for (const [type, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostUsed = type;
+      }
+    }
+
+    return mostUsed;
+  }
+
   // ==================== CURRENCY & PAYMENT ====================
 
   private async processPayment(params: {
