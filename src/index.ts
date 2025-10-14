@@ -1,6 +1,7 @@
 import { AuctionAgent } from './agent';
+import { ChatAgent } from './chat-agent';
 
-export { AuctionAgent };
+export { AuctionAgent, ChatAgent };
 
 // API handlers for Cloudflare Workers
 export default {
@@ -113,6 +114,41 @@ export default {
         return jsonResponse(result, corsHeaders);
       }
 
+      // Chat endpoints
+      if (url.pathname === '/api/chat' && request.method === 'POST') {
+        const body = await request.json();
+        const { userId, message } = body;
+
+        if (!userId || !message) {
+          return jsonResponse({ error: 'Missing userId or message' }, corsHeaders, 400);
+        }
+
+        const chatId = env.CHAT_AGENT.idFromName(userId);
+        const chatStub = env.CHAT_AGENT.get(chatId);
+
+        const result = await chatStub.chat({ userId, message });
+
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/chat\/[^/]+\/history$/) && request.method === 'GET') {
+        const userId = url.pathname.split('/')[3];
+        const chatId = env.CHAT_AGENT.idFromName(userId);
+        const chatStub = env.CHAT_AGENT.get(chatId);
+
+        const result = await chatStub.getHistory(userId);
+        return jsonResponse(result, corsHeaders);
+      }
+
+      if (url.pathname.match(/^\/api\/chat\/[^/]+\/history$/) && request.method === 'DELETE') {
+        const userId = url.pathname.split('/')[3];
+        const chatId = env.CHAT_AGENT.idFromName(userId);
+        const chatStub = env.CHAT_AGENT.get(chatId);
+
+        await chatStub.clearHistory(userId);
+        return jsonResponse({ success: true }, corsHeaders);
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (error) {
       return jsonResponse(
@@ -137,5 +173,6 @@ function jsonResponse(data: any, headers: Record<string, string>, status: number
 // TypeScript environment interface
 interface Env {
   AUCTION_AGENT: DurableObjectNamespace;
+  CHAT_AGENT: DurableObjectNamespace;
   AI: Ai;
 }
