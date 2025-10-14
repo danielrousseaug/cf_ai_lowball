@@ -62,6 +62,92 @@ export class ChatAgent extends Agent {
   }
 
   /**
+   * Handle incoming chat message
+   */
+  async chat(params: {
+    userId: string;
+    message: string;
+  }): Promise<{ response: string; messageId: string }> {
+    await this.ensureInitialized();
+
+    // Save user message
+    const userMessageId = this.generateId();
+    const userTimestamp = Date.now();
+
+    await this.sql`
+      INSERT INTO messages (id, user_id, role, content, timestamp)
+      VALUES (${userMessageId}, ${params.userId}, 'user', ${params.message}, ${userTimestamp})
+    `;
+
+    // Get conversation history
+    const history = await this.getMessageHistory(params.userId);
+
+    // Get environment bindings
+    const ai = (this.env as any).AI;
+    const auctionAgentNamespace = (this.env as any).AUCTION_AGENT;
+    const auctionAgentId = auctionAgentNamespace.idFromName('main');
+    const auctionAgent = auctionAgentNamespace.get(auctionAgentId);
+
+    // Create Workers AI provider
+    const workersai = createWorkersAI({ binding: ai });
+
+    // Build messages array for AI
+    const messages = [
+      {
+        role: 'system' as const,
+        content: `You are an AI assistant for Lowball, a reverse auction platform where people post tasks and others bid DOWN to do them - the lowest bidder wins.
+
+Key Platform Concepts:
+- Tasks are posted with a starting payment amount
+- Users bid LOWER amounts to compete (e.g., 200 → 150 → 120 points)
+- The person willing to do the task for the least money/points wins
+- Users don't need balance to bid - they're offering to DO work
+- Bidders get paid by the task creator when they complete the work
+- Multiple currency types: cash ($), points, favor tokens, time bank (minutes)
+
+Your role:
+- Help users understand how reverse auctions work
+- Provide bid recommendations based on market data
+- Answer questions about their tasks, bids, and performance
+- Offer strategic advice for winning bids or creating effective tasks
+- Be friendly, concise, and helpful
+
+Current user: ${params.userId}`,
+      },
+      ...history.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      })),
+    ];
+
+    // Stream AI response
+    const result = await streamText({
+      model: workersai('@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
+      messages,
+      maxTokens: 1000,
+      temperature: 0.7,
+    });
+
+    // Collect the full response
+    let fullResponse = '';
+    for await (const chunk of result.textStream) {
+      fullResponse += chunk;
+    }
+
+    // Save assistant message
+    const assistantMessageId = this.generateId();
+    await this.sql`
+      INSERT INTO messages (id, user_id, role, content, timestamp)
+      VALUES (${assistantMessageId}, ${params.userId}, 'assistant', ${fullResponse}, ${Date.now()})
+    `;
+
+    return {
+      response: fullResponse,
+      messageId: assistantMessageId,
+    };
+  }
+
+  /**
    * Get conversation history (all messages)
    */
   async getHistory(userId: string): Promise<ChatMessage[]> {
