@@ -91,6 +91,88 @@ export class ChatAgent extends Agent {
     // Create Workers AI provider
     const workersai = createWorkersAI({ binding: ai });
 
+    // Define tools the AI can use
+    const tools = {
+      getBidRecommendation: tool({
+        description: 'Get a bid recommendation for a specific task based on historical data',
+        parameters: z.object({
+          taskId: z.string().describe('The ID of the task'),
+        }),
+        execute: async ({ taskId }) => {
+          try {
+            const task = await auctionAgent.getTask(taskId);
+            if (!task) return { error: 'Task not found' };
+
+            const bids = await auctionAgent.getTaskBids(taskId);
+            const prediction = await auctionAgent.getPredictedBidRange(taskId);
+
+            return {
+              currentBid: task.currentBid,
+              numberOfBids: bids.length,
+              prediction,
+              recommendation: prediction
+                ? `Based on similar tasks, bids typically range from ${prediction.min} to ${prediction.max} ${task.currentBid.type}, with an average of ${prediction.average}. To be competitive, consider bidding around ${Math.floor(prediction.average * 0.95)} ${task.currentBid.type}.`
+                : `This task currently has a bid of ${task.currentBid.amount} ${task.currentBid.type}. To win, you need to bid lower than this amount.`
+            };
+          } catch (error) {
+            return { error: 'Failed to get bid recommendation' };
+          }
+        },
+      }),
+
+      getUserStats: tool({
+        description: 'Get statistics for a user including tasks completed, win rate, and performance',
+        parameters: z.object({
+          userId: z.string().describe('The user ID'),
+        }),
+        execute: async ({ userId }) => {
+          try {
+            const profile = await auctionAgent.getUserProfile(userId);
+            const balance = await auctionAgent.getUserBalance(userId);
+            const tasks = await auctionAgent.getUserTasks(userId);
+
+            return {
+              profile,
+              balance,
+              tasksCreated: tasks.created.length,
+              tasksWon: tasks.won.length,
+              activeBids: tasks.bidding.length,
+            };
+          } catch (error) {
+            return { error: 'Failed to get user stats' };
+          }
+        },
+      }),
+
+      searchTasks: tool({
+        description: 'Search for active tasks, optionally filtered by category',
+        parameters: z.object({
+          category: z.string().optional().describe('Optional category filter'),
+        }),
+        execute: async ({ category }) => {
+          try {
+            const tasks = await auctionAgent.getActiveTasks();
+            const filtered = category
+              ? tasks.filter(t => t.category === category)
+              : tasks;
+
+            return {
+              totalTasks: filtered.length,
+              tasks: filtered.slice(0, 5).map(t => ({
+                id: t.id,
+                title: t.title,
+                category: t.category,
+                currentBid: t.currentBid,
+                timeRemaining: t.endTime - Date.now(),
+              })),
+            };
+          } catch (error) {
+            return { error: 'Failed to search tasks' };
+          }
+        },
+      }),
+    };
+
     // Build messages array for AI
     const messages = [
       {
@@ -124,6 +206,7 @@ Current user: ${params.userId}`,
     const result = await streamText({
       model: workersai('@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
       messages,
+      tools,
       maxTokens: 1000,
       temperature: 0.7,
     });
