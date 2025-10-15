@@ -1,0 +1,59 @@
+Lowball - Reverse Auction Platform
+===================================
+
+Project Overview:
+-----------------
+A platform where people bid DOWN for tasks. Lowest bidder wins and completes the work.
+
+Core Features:
+--------------
+✓ Reverse auction bidding (lower = better)
+✓ Multi-currency support (cash, points, favor tokens, time bank)
+✓ Task creation and management
+✓ User profiles with reputation scores
+✓ Achievement system
+✓ Leaderboards
+✓ Real-time bid updates
+✓ Buy It Now option
+✓ Dutch auctions
+✓ AI-powered chat assistant (Workers AI + Llama 3.3 70B)
+
+Architecture:
+-------------
+Backend:
+- Cloudflare Workers (edge compute)
+- Durable Objects (persistent state)
+- Workers AI (chat assistant)
+
+Frontend (planned):
+- Next.js 14
+- React
+- TanStack Query
+- Tailwind CSS
+- Framer Motion
+
+Database:
+- Durable Objects with SQLite
+- In-memory Maps for fast access
+
+Development Status:
+-------------------
+[✓] Core backend implementation
+[✓] Reverse auction logic
+[✓] Multi-currency system
+[✓] User management
+[✓] Gamification
+[✓] AI chat integration
+[✓] API endpoints
+[✓] Documentation
+[ ] Frontend implementation (TODO)
+[ ] Real-time WebSocket updates (TODO)
+[ ] Push notifications (TODO)
+
+Next Steps:
+-----------
+1. Build Next.js frontend
+2. Add WebSocket support for real-time updates
+3. Implement push notifications
+4. Add more auction types
+5. Create mobile app
