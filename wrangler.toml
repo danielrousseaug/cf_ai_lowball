@@ -24,5 +24,10 @@ new_sqlite_classes = ["ChatAgent"]
 [ai]
 binding = "AI"
 
+# Future features (commented out):
 # [[send_email]]
 # name = "EMAIL"
+
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "lowball-uploads"
