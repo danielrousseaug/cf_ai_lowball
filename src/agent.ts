@@ -240,6 +240,9 @@ export class AuctionAgent extends Agent {
   async getActiveTasks(): Promise<TaskDetails[]> {
     await this.ensureInitialized();
 
+    // Check for ended auctions before returning
+    await this.checkEndedAuctions();
+
     return Array.from(this.state.tasks.values())
       .filter(t => t.status === 'active')
       .sort((a, b) => a.endTime - b.endTime);
