@@ -314,6 +314,26 @@ export class AuctionAgent extends Agent {
     }
   }
 
+  private async updateDutchAuctions() {
+    const now = Date.now();
+
+    for (const [taskId, task] of this.state.tasks.entries()) {
+      if (task.status === 'active' && task.auctionType === 'dutch' && task.dutchDecreaseRate) {
+        const hoursElapsed = (now - task.startTime) / (60 * 60 * 1000);
+        const decrease = Math.floor(hoursElapsed) * task.dutchDecreaseRate;
+        const newAmount = Math.max(0, task.startingPayment.amount - decrease);
+
+        if (newAmount !== task.currentBid.amount) {
+          task.currentBid = {
+            type: task.startingPayment.type,
+            amount: newAmount
+          };
+          await this.persistState();
+        }
+      }
+    }
+  }
+
   private async finalizeAuction(taskId: string) {
     const task = this.state.tasks.get(taskId);
     if (!task) return;
