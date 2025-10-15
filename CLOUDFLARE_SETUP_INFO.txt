@@ -1,0 +1,37 @@
+Cloudflare Workers Setup Instructions
+======================================
+
+This project uses Cloudflare Workers and Durable Objects for the backend.
+
+Prerequisites:
+--------------
+1. Cloudflare account (free tier works)
+2. Node.js 18+ installed
+3. Wrangler CLI installed (`npm install -g wrangler`)
+
+Setup Steps:
+------------
+1. Login to Wrangler:
+   wrangler login
+
+2. Get your account ID:
+   - Go to Cloudflare Dashboard
+   - Copy your Account ID from the right sidebar
+   - Add it to wrangler.toml
+
+3. Enable Workers AI:
+   - Go to Workers & Pages > AI
+   - Enable Workers AI for your account
+
+4. Deploy:
+   npm install
+   npm run deploy
+
+That's it! Your reverse auction backend is now live on Cloudflare's edge network.
+
+Useful Commands:
+----------------
+- `npm run dev` - Start local development server
+- `npm run deploy` - Deploy to production
+- `wrangler tail` - View live logs
+- `wrangler d1 execute` - Query Durable Objects storage
