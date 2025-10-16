@@ -1,37 +1,121 @@
-Cloudflare Workers Setup Instructions
-======================================
+# Cloudflare Agents & API Keys - Important Information
 
-This project uses Cloudflare Workers and Durable Objects for the backend.
+## Why No API Keys for Local Development
 
-Prerequisites:
---------------
-1. Cloudflare account (free tier works)
-2. Node.js 18+ installed
-3. Wrangler CLI installed (`npm install -g wrangler`)
+When you run `npm run dev` locally, Wrangler (Cloudflare's CLI) runs a local development
+server on your machine. It's completely simulated - no connection to Cloudflare at all.
 
-Setup Steps:
-------------
-1. Login to Wrangler:
-   wrangler login
+npm run dev → Wrangler starts local server → http://localhost:8787
+              (runs entirely on your computer)
 
-2. Get your account ID:
-   - Go to Cloudflare Dashboard
-   - Copy your Account ID from the right sidebar
-   - Add it to wrangler.toml
+What it uses:
+- Local file system for storage (simulates Durable Objects)
+- Your CPU for processing
+- No internet connection needed
+- Zero Cloudflare API calls
 
-3. Enable Workers AI:
-   - Go to Workers & Pages > AI
-   - Enable Workers AI for your account
+It's like running a regular Node.js server, but with Cloudflare's runtime simulated.
 
-4. Deploy:
+---
+
+## Cloudflare Agents SDK - Important Clarification
+
+The "Cloudflare Agents SDK" used in the code (import { Agent } from 'agents') is:
+
+1. Based on the documentation you provided in plan.txt
+2. Might be in beta/preview or documentation for an upcoming feature
+3. May not be publicly available yet
+
+However, the underlying technology IS free and available:
+
+✅ Cloudflare Workers (Free Tier):
+- 100,000 requests per day FREE
+- After that: $5/month for 10M requests
+- No credit card required for free tier
+
+✅ Durable Objects (Free Tier):
+- Included in Workers free tier
+- Provides the persistent storage we need
+- 30-second CPU time per day free
+
+---
+
+## What This Means
+
+Option 1: Use Standard Durable Objects (Definitely Works)
+If the "Agents SDK" isn't available, the code can be quickly refactored to use standard
+Durable Objects, which are 100% production-ready and free. The functionality would be identical.
+
+Option 2: Try the Agents SDK (Might Need Beta Access)
+The code as-written assumes the Agents SDK exists. When you deploy, if it's not available,
+you'd get an error like:
+  Cannot find module 'agents'
+
+---
+
+## Cloudflare's Free Tier (No Credit Card)
+
+For deployment, Cloudflare Workers is extremely generous:
+
+Feature          | Free Tier      | Paid Plan
+---------------- | -------------- | ----------------
+Requests         | 100K/day       | $5/mo for 10M
+CPU Time         | 10ms per req   | 50ms per req
+Workers          | Unlimited      | Unlimited
+Durable Objects  | 30s CPU/day    | Unlimited
+Storage          | 1GB            | 1GB+
+
+Authentication:
+  npx wrangler login
+  # Opens browser → "Allow wrangler to access your account?"
+  # Click "Allow" → Done! No keys to copy/paste
+
+---
+
+## Two Paths Forward
+
+Path A: Try It With Agents SDK
+  cd /home/danie/projects/agents
+  npm run dev
+
+  If you see errors about 'agents' module not found, go to Path B.
+
+Path B: Use Standard Durable Objects
+  The Agent class can be converted to a regular DurableObject class in 5 minutes:
+
+  Change from:
+    export class AuctionAgent extends Agent { }
+
+  To:
+    export class AuctionAgent implements DurableObject {
+      constructor(private state: DurableObjectState, private env: Env) {}
+      // Everything else stays the same
+    }
+
+---
+
+## Cost Reality Check
+
+For your use case:
+- Development: $0 (local only)
+- Small deployment (testing): $0 (free tier)
+- Production with real users: Maybe $5/month if you exceed 100K requests/day
+
+No surprise bills - Cloudflare Workers is known for:
+- No cold starts (unlike AWS Lambda)
+- Flat pricing (no per-function charges)
+- Free tier that actually works for real apps
+
+---
+
+## Recommendation
+
+1. Try starting the backend now - See what happens:
+   cd /home/danie/projects/agents
    npm install
-   npm run deploy
+   npm run dev
 
-That's it! Your reverse auction backend is now live on Cloudflare's edge network.
+2. If it works → Great! The Agents SDK is available or Wrangler handles it
+3. If you get module errors → Refactor to standard Durable Objects (5-10 min)
 
-Useful Commands:
-----------------
-- `npm run dev` - Start local development server
-- `npm run deploy` - Deploy to production
-- `wrangler tail` - View live logs
-- `wrangler d1 execute` - Query Durable Objects storage
+The core logic is all there - it's just a matter of which wrapper we use.

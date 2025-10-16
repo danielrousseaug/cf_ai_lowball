@@ -43,25 +43,6 @@ export class ChatAgent extends Agent {
   }
 
   /**
-   * Get message history for a user
-   */
-  private async getMessageHistory(userId: string, limit: number = 10): Promise<ChatMessage[]> {
-    const rows = await this.sql`
-      SELECT * FROM messages
-      WHERE user_id = ${userId}
-      ORDER BY timestamp DESC
-      LIMIT ${limit}
-    `;
-
-    return rows.reverse().map(row => ({
-      id: row.id as string,
-      role: row.role as 'user' | 'assistant',
-      content: row.content as string,
-      timestamp: row.timestamp as number,
-    }));
-  }
-
-  /**
    * Handle incoming chat message
    */
   async chat(params: {
@@ -228,6 +209,25 @@ Current user: ${params.userId}`,
       response: fullResponse,
       messageId: assistantMessageId,
     };
+  }
+
+  /**
+   * Get message history for a user
+   */
+  private async getMessageHistory(userId: string, limit: number = 10): Promise<ChatMessage[]> {
+    const rows = await this.sql`
+      SELECT * FROM messages
+      WHERE user_id = ${userId}
+      ORDER BY timestamp DESC
+      LIMIT ${limit}
+    `;
+
+    return rows.reverse().map(row => ({
+      id: row.id as string,
+      role: row.role as 'user' | 'assistant',
+      content: row.content as string,
+      timestamp: row.timestamp as number,
+    }));
   }
 
   /**

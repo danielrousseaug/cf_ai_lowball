@@ -1,59 +1,124 @@
-Lowball - Reverse Auction Platform
-===================================
+This is a project meant to use Cloudflare Agents, the main point of the project is to demonstrate usage
+of CloudFlare agents and as such using them extensively should be a focus
 
-Project Overview:
------------------
-A platform where people bid DOWN for tasks. Lowest bidder wins and completes the work.
+Documentation found here:
 
-Core Features:
---------------
-✓ Reverse auction bidding (lower = better)
-✓ Multi-currency support (cash, points, favor tokens, time bank)
-✓ Task creation and management
-✓ User profiles with reputation scores
-✓ Achievement system
-✓ Leaderboards
-✓ Real-time bid updates
-✓ Buy It Now option
-✓ Dutch auctions
-✓ AI-powered chat assistant (Workers AI + Llama 3.3 70B)
+https://developers.cloudflare.com/agents/
 
-Architecture:
--------------
-Backend:
-- Cloudflare Workers (edge compute)
-- Durable Objects (persistent state)
-- Workers AI (chat assistant)
+Project Guidelines:
 
-Frontend (planned):
-- Next.js 14
-- React
-- TanStack Query
-- Tailwind CSS
-- Framer Motion
+Reverse Auction Coordinator - Deep Dive
+Core Concept
+Instead of bidding up for things people want, users bid down for tasks nobody wants to do. The person willing to do it for the least compensation (money, points, or favors) wins the "privilege" of doing the task.
+How It Works
+Task Creation Flow:
 
-Database:
-- Durable Objects with SQLite
-- In-memory Maps for fast access
+Someone posts an undesirable task: "Clean the shared bathroom"
+Sets a starting "payment" (e.g., $20, 200 points, or 2 favor tokens)
+Sets auction duration (e.g., 24 hours)
+Optional: Add verification requirements (photo proof, peer confirmation)
 
-Development Status:
--------------------
-[✓] Core backend implementation
-[✓] Reverse auction logic
-[✓] Multi-currency system
-[✓] User management
-[✓] Gamification
-[✓] AI chat integration
-[✓] API endpoints
-[✓] Documentation
-[ ] Frontend implementation (TODO)
-[ ] Real-time WebSocket updates (TODO)
-[ ] Push notifications (TODO)
+Bidding Mechanics:
 
-Next Steps:
------------
-1. Build Next.js frontend
-2. Add WebSocket support for real-time updates
-3. Implement push notifications
-4. Add more auction types
-5. Create mobile app
+Users underbid each other: "I'll do it for $18" → "I'll do it for $15" → "I'll do it for $12"
+Optional "Buy It Now" price for urgent tasks ("I need this done NOW for $30")
+Last-minute bidding protection (extends auction by 5 minutes if bid comes in final minute)
+Reverse Dutch auction variant: Price automatically decreases over time until someone accepts
+
+Advanced Features
+Multi-Currency System:
+
+Cash: Direct payment between users
+Chore Points: Internal currency earned by doing tasks
+Favor Tokens: "I owe you one" system - can be redeemed to force task assignment
+Time Banks: "I'll do 30 minutes of your tasks if you do 30 minutes of mine"
+
+Reputation & Gamification:
+
+Reliability Score: Did they complete tasks on time?
+Quality Rating: How well was it done? (peer reviewed)
+Bidding History: Are they a fair player or do they always bail?
+Achievements: "Bathroom Hero" (10 bathroom cleans), "Night Owl" (takes late-night tasks)
+Leaderboards: Weekly/monthly rankings by points earned or tasks completed
+
+Smart Scheduling:
+
+Agent learns user patterns: "Sarah usually bids on weekend tasks"
+Predictive notifications: "Based on history, this task will likely go for $8-12"
+Auto-bidding: "Automatically bid on dishwasher duties if price goes above $5"
+Task bundling: "Take all three bathroom tasks this week for a 20% bonus"
+
+Use Case Scenarios
+Roommate House:
+
+Weekly grocery shopping runs
+Deep cleaning before inspections
+Waiting for repair technicians
+Dealing with the landlord
+Taking out trash on cold mornings
+
+Small Office:
+
+Coffee machine cleaning
+Friday afternoon mail run
+Organizing the supply closet
+Being the one to tell the boss bad news
+Setting up for office parties
+
+Family Household:
+
+Driving kids to early morning practice
+Attending boring school events
+Cleaning up after the dog
+Calling customer service for disputes
+Assembling IKEA furniture
+
+Technical Implementation with Cloudflare Agents
+Persistent State Management:
+javascriptclass AuctionAgent extends Agent {
+  state = {
+    auctions: Map<taskId, AuctionDetails>,
+    userProfiles: Map<userId, Profile>,
+    completionHistory: Array<CompletedTask>,
+    currencyBalances: Map<userId, Balances>
+  }
+}
+Scheduled Operations:
+
+Check auction endings every minute
+Send daily digest of new tasks
+Weekly reputation score updates
+Monthly settlement of point balances
+
+Real-time Features:
+
+WebSocket connections for live bid updates
+Push notifications for outbid alerts
+Instant messaging between task poster and winner
+
+Monetization Ideas
+
+Premium Groups: Advanced features for paid teams
+Task Insurance: Pay small fee to guarantee someone will do it
+Express Tasks: Pay extra to get tasks done within hours
+Arbitration Service: Resolve disputes about task completion
+
+Psychological Hooks
+Loss Aversion: "You're about to lose this easy $10 task to someone else!"
+Social Pressure: Everyone can see who hasn't done tasks in a while
+Gambler's Thrill: The excitement of winning a bidding war (even for chores)
+Fairness Mechanism: No more arguing about who "always" does certain tasks - the market decides
+Potential Expansions
+AI Integration:
+
+Suggest fair starting prices based on task history
+Detect task completion via photo analysis
+Natural language task creation from voice notes
+Predict which users are most likely to bid
+
+External Integrations:
+
+Connect to Venmo/PayPal for automatic payments
+Calendar integration to know user availability
+Smart home integration ("Alexa, post the dishwasher task")
+Slack/Discord bots for office environments

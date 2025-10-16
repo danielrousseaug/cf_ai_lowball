@@ -47,6 +47,9 @@ export class AuctionAgent extends Agent {
     if (stored.length > 0) {
       this.state = this.deserializeState(stored[0].data);
     }
+
+    // Note: Scheduled tasks (auction checks, leaderboard updates) would use Durable Object Alarms in production
+    // For now, they're called on-demand or during API requests
   }
 
   // ==================== TASK CREATION ====================
@@ -136,6 +139,9 @@ export class AuctionAgent extends Agent {
       return { success: false, message: 'Bid must be lower than current bid' };
     }
 
+    // Note: In reverse auctions, bidders don't need balance - they're offering to DO the work.
+    // The task creator pays the winner when the task is completed.
+
     // Create bid
     const bid: Bid = {
       id: this.generateId(),
@@ -176,106 +182,6 @@ export class AuctionAgent extends Agent {
     return { success: true, message: 'Bid placed successfully', bid };
   }
 
-  // ==================== USER MANAGEMENT ====================
-
-  async createUser(params: {
-    id: string;
-    name: string;
-    email: string;
-  }): Promise<UserProfile> {
-    await this.ensureInitialized();
-
-    const user: UserProfile = {
-      id: params.id,
-      name: params.name,
-      email: params.email,
-      reliabilityScore: 100,
-      qualityRating: 5,
-      totalTasksCompleted: 0,
-      totalTasksCreated: 0,
-      bidHistory: [],
-      achievements: [],
-      preferences: {
-        notificationSettings: {
-          outbid: true,
-          newTasks: true,
-          taskReminders: true
-        }
-      }
-    };
-
-    this.state.users.set(params.id, user);
-    this.state.balances.set(params.id, this.getDefaultBalances());
-
-    await this.persistState();
-
-    return user;
-  }
-
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
-    await this.ensureInitialized();
-    return this.state.users.get(userId) || null;
-  }
-
-  private getDefaultBalances(): Balances {
-    return {
-      cash: 0,
-      points: 100, // Starting points
-      favorTokens: 2, // Starting favor tokens
-      timeBank: 0
-    };
-  }
-
-  async getUserBalance(userId: string): Promise<Balances> {
-    return this.state.balances.get(userId) || this.getDefaultBalances();
-  }
-
-  // ==================== QUERIES ====================
-
-  async getTask(taskId: string): Promise<TaskDetails | null> {
-    await this.ensureInitialized();
-    return this.state.tasks.get(taskId) || null;
-  }
-
-  async getActiveTasks(): Promise<TaskDetails[]> {
-    await this.ensureInitialized();
-
-    // Check for ended auctions before returning
-    await this.checkEndedAuctions();
-
-    return Array.from(this.state.tasks.values())
-      .filter(t => t.status === 'active')
-      .sort((a, b) => a.endTime - b.endTime);
-  }
-
-  async getTaskBids(taskId: string): Promise<Bid[]> {
-    await this.ensureInitialized();
-    return this.state.bids.get(taskId) || [];
-  }
-
-  async getUserTasks(userId: string): Promise<{
-    created: TaskDetails[];
-    won: TaskDetails[];
-    bidding: TaskDetails[];
-  }> {
-    const allTasks = Array.from(this.state.tasks.values());
-
-    const created = allTasks.filter(t => t.creatorId === userId);
-    const won = allTasks.filter(t => t.winnerId === userId);
-
-    const userBids = Array.from(this.state.bids.entries())
-      .filter(([_, bids]) => bids.some(b => b.userId === userId))
-      .map(([taskId, _]) => taskId);
-
-    const bidding = allTasks.filter(t =>
-      userBids.includes(t.id) && t.status === 'active' && t.winnerId !== userId
-    );
-
-    return { created, won, bidding };
-  }
-
-  // ==================== AUCTION LIFECYCLE ====================
-
   async acceptBuyItNow(params: {
     taskId: string;
     userId: string;
@@ -302,6 +208,15 @@ export class AuctionAgent extends Agent {
     await this.notifyTaskWinner(task);
 
     return { success: true, message: 'Task claimed via Buy It Now' };
+  }
+
+  // ==================== AUCTION LIFECYCLE ====================
+
+  private async scheduleAuctionChecks() {
+    // In production, this would use Durable Object Alarms
+    // For now, we check on each API call
+    await this.checkEndedAuctions();
+    await this.updateDutchAuctions();
   }
 
   private async checkEndedAuctions() {
@@ -355,18 +270,6 @@ export class AuctionAgent extends Agent {
     await this.persistState();
   }
 
-  private async notifyTaskWinner(task: TaskDetails) {
-    if (task.winnerId) {
-      await this.sendNotification({
-        type: 'won',
-        userId: task.winnerId,
-        taskId: task.id,
-        message: `Congratulations! You won the task "${task.title}"`,
-        timestamp: Date.now()
-      });
-    }
-  }
-
   // ==================== TASK COMPLETION ====================
 
   async completeTask(params: {
@@ -388,6 +291,12 @@ export class AuctionAgent extends Agent {
 
     if (task.status !== 'in-progress') {
       return { success: false, message: 'Task is not in progress' };
+    }
+
+    // Verify completion if required
+    if (task.verificationRequired) {
+      // In a real implementation, this would trigger verification logic
+      // For now, we'll assume it's verified
     }
 
     // Process payment
@@ -422,6 +331,118 @@ export class AuctionAgent extends Agent {
     return { success: true, message: 'Task completed successfully' };
   }
 
+  // ==================== CURRENCY & PAYMENT ====================
+
+  private async processPayment(params: {
+    fromUserId: string;
+    toUserId: string;
+    amount: Currency;
+  }) {
+    const fromBalance = this.state.balances.get(params.fromUserId) || this.getDefaultBalances();
+    const toBalance = this.state.balances.get(params.toUserId) || this.getDefaultBalances();
+
+    // Deduct from creator
+    if (params.amount.type === 'cash') {
+      fromBalance.cash -= params.amount.amount;
+    } else if (params.amount.type === 'points') {
+      fromBalance.points -= params.amount.amount;
+    } else if (params.amount.type === 'favorTokens') {
+      fromBalance.favorTokens -= params.amount.amount;
+    } else if (params.amount.type === 'timeBank') {
+      fromBalance.timeBank -= params.amount.amount;
+    }
+
+    // Add to winner
+    if (params.amount.type === 'cash') {
+      toBalance.cash += params.amount.amount;
+    } else if (params.amount.type === 'points') {
+      toBalance.points += params.amount.amount;
+    } else if (params.amount.type === 'favorTokens') {
+      toBalance.favorTokens += params.amount.amount;
+    } else if (params.amount.type === 'timeBank') {
+      toBalance.timeBank += params.amount.amount;
+    }
+
+    this.state.balances.set(params.fromUserId, fromBalance);
+    this.state.balances.set(params.toUserId, toBalance);
+  }
+
+  private getDefaultBalances(): Balances {
+    return {
+      cash: 0,
+      points: 100, // Starting points
+      favorTokens: 2, // Starting favor tokens
+      timeBank: 0
+    };
+  }
+
+  async getUserBalance(userId: string): Promise<Balances> {
+    return this.state.balances.get(userId) || this.getDefaultBalances();
+  }
+
+  async addBalance(params: {
+    userId: string;
+    currency: Currency;
+  }): Promise<Balances> {
+    const balance = this.state.balances.get(params.userId) || this.getDefaultBalances();
+
+    if (params.currency.type === 'cash') {
+      balance.cash += params.currency.amount;
+    } else if (params.currency.type === 'points') {
+      balance.points += params.currency.amount;
+    } else if (params.currency.type === 'favorTokens') {
+      balance.favorTokens += params.currency.amount;
+    } else if (params.currency.type === 'timeBank') {
+      balance.timeBank += params.currency.amount;
+    }
+
+    this.state.balances.set(params.userId, balance);
+    await this.persistState();
+
+    return balance;
+  }
+
+  // ==================== USER MANAGEMENT ====================
+
+  async createUser(params: {
+    id: string;
+    name: string;
+    email: string;
+  }): Promise<UserProfile> {
+    await this.ensureInitialized();
+
+    const user: UserProfile = {
+      id: params.id,
+      name: params.name,
+      email: params.email,
+      reliabilityScore: 100,
+      qualityRating: 5,
+      totalTasksCompleted: 0,
+      totalTasksCreated: 0,
+      bidHistory: [],
+      achievements: [],
+      preferences: {
+        notificationSettings: {
+          outbid: true,
+          newTasks: true,
+          taskReminders: true
+        }
+      }
+    };
+
+    this.state.users.set(params.id, user);
+    this.state.balances.set(params.id, this.getDefaultBalances());
+
+    await this.persistState();
+
+    return user;
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    await this.ensureInitialized();
+    return this.state.users.get(userId) || null;
+  }
+
   async updateUserReputation(userId: string, qualityRating?: number) {
     const user = this.state.users.get(userId);
     if (!user) return;
@@ -436,6 +457,7 @@ export class AuctionAgent extends Agent {
     }
 
     // Calculate reliability score based on completion rate
+    // In a real implementation, track failures and no-shows
     user.reliabilityScore = Math.min(100, user.reliabilityScore + 0.5);
 
     this.state.users.set(userId, user);
@@ -520,6 +542,11 @@ export class AuctionAgent extends Agent {
     }
 
     return counts;
+  }
+
+  private async scheduleLeaderboardUpdate() {
+    // In production, this would use Durable Object Alarms
+    // For now, we update on-demand
   }
 
   private async updateLeaderboard() {
@@ -641,68 +668,48 @@ export class AuctionAgent extends Agent {
     return mostUsed;
   }
 
-  // ==================== CURRENCY & PAYMENT ====================
+  // ==================== QUERIES ====================
 
-  private async processPayment(params: {
-    fromUserId: string;
-    toUserId: string;
-    amount: Currency;
-  }) {
-    const fromBalance = this.state.balances.get(params.fromUserId) || this.getDefaultBalances();
-    const toBalance = this.state.balances.get(params.toUserId) || this.getDefaultBalances();
-
-    // Deduct from creator
-    if (params.amount.type === 'cash') {
-      fromBalance.cash -= params.amount.amount;
-    } else if (params.amount.type === 'points') {
-      fromBalance.points -= params.amount.amount;
-    } else if (params.amount.type === 'favorTokens') {
-      fromBalance.favorTokens -= params.amount.amount;
-    } else if (params.amount.type === 'timeBank') {
-      fromBalance.timeBank -= params.amount.amount;
-    }
-
-    // Add to winner
-    if (params.amount.type === 'cash') {
-      toBalance.cash += params.amount.amount;
-    } else if (params.amount.type === 'points') {
-      toBalance.points += params.amount.amount;
-    } else if (params.amount.type === 'favorTokens') {
-      toBalance.favorTokens += params.amount.amount;
-    } else if (params.amount.type === 'timeBank') {
-      toBalance.timeBank += params.amount.amount;
-    }
-
-    this.state.balances.set(params.fromUserId, fromBalance);
-    this.state.balances.set(params.toUserId, toBalance);
+  async getTask(taskId: string): Promise<TaskDetails | null> {
+    await this.ensureInitialized();
+    return this.state.tasks.get(taskId) || null;
   }
 
-  async addBalance(params: {
-    userId: string;
-    currency: Currency;
-  }): Promise<Balances> {
-    const balance = this.state.balances.get(params.userId) || this.getDefaultBalances();
+  async getActiveTasks(): Promise<TaskDetails[]> {
+    await this.ensureInitialized();
 
-    if (params.currency.type === 'cash') {
-      balance.cash += params.currency.amount;
-    } else if (params.currency.type === 'points') {
-      balance.points += params.currency.amount;
-    } else if (params.currency.type === 'favorTokens') {
-      balance.favorTokens += params.currency.amount;
-    } else if (params.currency.type === 'timeBank') {
-      balance.timeBank += params.currency.amount;
-    }
+    // Check for ended auctions before returning
+    await this.scheduleAuctionChecks();
 
-    this.state.balances.set(params.userId, balance);
-    await this.persistState();
-
-    return balance;
+    return Array.from(this.state.tasks.values())
+      .filter(t => t.status === 'active')
+      .sort((a, b) => a.endTime - b.endTime);
   }
 
-  // ==================== UTILITIES ====================
+  async getTaskBids(taskId: string): Promise<Bid[]> {
+    await this.ensureInitialized();
+    return this.state.bids.get(taskId) || [];
+  }
 
-  private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  async getUserTasks(userId: string): Promise<{
+    created: TaskDetails[];
+    won: TaskDetails[];
+    bidding: TaskDetails[];
+  }> {
+    const allTasks = Array.from(this.state.tasks.values());
+
+    const created = allTasks.filter(t => t.creatorId === userId);
+    const won = allTasks.filter(t => t.winnerId === userId);
+
+    const userBids = Array.from(this.state.bids.entries())
+      .filter(([_, bids]) => bids.some(b => b.userId === userId))
+      .map(([taskId, _]) => taskId);
+
+    const bidding = allTasks.filter(t =>
+      userBids.includes(t.id) && t.status === 'active' && t.winnerId !== userId
+    );
+
+    return { created, won, bidding };
   }
 
   // ==================== NOTIFICATIONS ====================
@@ -728,6 +735,18 @@ export class AuctionAgent extends Agent {
           });
         }
       }
+    }
+  }
+
+  private async notifyTaskWinner(task: TaskDetails) {
+    if (task.winnerId) {
+      await this.sendNotification({
+        type: 'won',
+        userId: task.winnerId,
+        taskId: task.id,
+        message: `Congratulations! You won the task "${task.title}"`,
+        timestamp: Date.now()
+      });
     }
   }
 
@@ -763,5 +782,11 @@ export class AuctionAgent extends Agent {
       completedTasks: parsed.completedTasks,
       leaderboard: parsed.leaderboard
     };
+  }
+
+  // ==================== UTILITIES ====================
+
+  private generateId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }
