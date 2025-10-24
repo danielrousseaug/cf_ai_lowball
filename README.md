@@ -5,6 +5,11 @@
 
 A reverse auction platform where users bid down for undesirable tasks. The person willing to do it for the least compensation wins.
 
+## 🚀 Live Demo
+
+- **Frontend:** [https://cf-ai-lowball.vercel.app/](https://cf-ai-lowball.vercel.app/)
+- **Backend API:** [https://reverse-auction-coordinator.danielrousseaug.workers.dev](https://reverse-auction-coordinator.danielrousseaug.workers.dev)
+
 ---
 
 ## Quick Start
