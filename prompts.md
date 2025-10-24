@@ -1,0 +1,27 @@
+# AI Prompts Used
+
+- how do cloudflare durable objects work for state management
+- what's the best way to structure typescript types for an auction system
+- help me understand reverse auction logic vs normal auctions
+- how to validate bids in a reverse auction
+- what's a good pattern for handling currency types in typescript
+- how do i prevent race conditions with concurrent bidding
+- help with typescript map serialization to JSON
+- what's the best way to handle auction end times
+- how to implement last-minute bid extensions
+- help me structure user reputation scoring
+- what achievements make sense for a task completion app
+- how to calculate weighted averages for ratings
+- help with cloudflare workers cors configuration
+- how do i route API requests in cloudflare workers
+- what's the difference between standard and dutch auctions
+- help me implement price decay logic for dutch auctions
+- how to organize notification events in typescript
+- what's a good leaderboard ranking algorithm
+- help with typescript interface for user preferences
+- how to structure completed task records
+- what's the best way to recommend tasks to users
+- help me understand category-based filtering
+- how do i handle payment processing between users
+- what's a good starting balance for gamification
+- help with calculating bid predictions from historical data

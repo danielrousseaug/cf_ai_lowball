@@ -26,7 +26,7 @@ export default {
     try {
       // Route requests
       if (url.pathname === '/api/tasks' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.createTask(body);
         return jsonResponse(result, corsHeaders);
       }
@@ -43,7 +43,7 @@ export default {
       }
 
       if (url.pathname === '/api/bids' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.placeBid(body);
         return jsonResponse(result, corsHeaders);
       }
@@ -55,19 +55,19 @@ export default {
       }
 
       if (url.pathname === '/api/tasks/buy-now' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.acceptBuyItNow(body);
         return jsonResponse(result, corsHeaders);
       }
 
       if (url.pathname === '/api/tasks/complete' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.completeTask(body);
         return jsonResponse(result, corsHeaders);
       }
 
       if (url.pathname === '/api/users' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.createUser(body);
         return jsonResponse(result, corsHeaders);
       }
@@ -85,7 +85,7 @@ export default {
       }
 
       if (url.pathname === '/api/balance/add' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const result = await stub.addBalance(body);
         return jsonResponse(result, corsHeaders);
       }
@@ -116,7 +116,7 @@ export default {
 
       // Chat endpoints
       if (url.pathname === '/api/chat' && request.method === 'POST') {
-        const body = await request.json();
+        const body: any = await request.json();
         const { userId, message } = body;
 
         if (!userId || !message) {
@@ -172,7 +172,7 @@ function jsonResponse(data: any, headers: Record<string, string>, status: number
 
 // TypeScript environment interface
 interface Env {
-  AUCTION_AGENT: DurableObjectNamespace;
-  CHAT_AGENT: DurableObjectNamespace;
+  AUCTION_AGENT: DurableObjectNamespace<AuctionAgent>;
+  CHAT_AGENT: DurableObjectNamespace<ChatAgent>;
   AI: Ai;
 }

@@ -12,9 +12,15 @@ import {
   NotificationEvent
 } from './types';
 
-export class AuctionAgent extends Agent {
+interface Env {
+  AUCTION_AGENT: DurableObjectNamespace;
+  CHAT_AGENT: DurableObjectNamespace;
+  AI: Ai;
+}
+
+export class AuctionAgent extends Agent<Env, AuctionState> {
   // Persistent state using Cloudflare Durable Objects
-  private state: AuctionState = {
+  initialState: AuctionState = {
     tasks: new Map(),
     bids: new Map(),
     users: new Map(),
@@ -45,7 +51,9 @@ export class AuctionAgent extends Agent {
     // Load state from storage
     const stored = await this.sql`SELECT * FROM state LIMIT 1`;
     if (stored.length > 0) {
-      this.state = this.deserializeState(stored[0].data);
+      const loadedState = this.deserializeState(stored[0].data as string);
+      // Update state via assignment since it's readonly via getter
+      Object.assign(this.state, loadedState);
     }
 
     // Note: Scheduled tasks (auction checks, leaderboard updates) would use Durable Object Alarms in production
