@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+body {
+  background: #fafafa;
+  color: #111827;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+* {
+  color: inherit;
+}
+
+/* Cursor pointers for all clickable elements */
+a, button, [role="button"], [type="button"], [type="submit"] {
+  cursor: pointer;
+}
+
+input, textarea, select {
+  color: #111827 !important;
+  background-color: #ffffff;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Ensure all prose content is visible */
+.prose, .prose * {
+  color: #111827 !important;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+.prose p, .prose li, .prose span {
+  color: #374151 !important;
+}
+
+.prose strong {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+.prose a {
+  color: #4b5563 !important;
+  text-decoration: underline;
+}
+
+.prose code {
+  color: #111827 !important;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
